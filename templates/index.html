@@ -13,10 +13,20 @@
             border-radius: 0.375rem;
             height: 300px;
             overflow-y: auto;
+            line-height: 1.5;
         }
         .console pre {
             margin: 0;
             white-space: pre-wrap;
+            border-bottom: 1px solid #333;
+            padding: 4px 0;
+        }
+        .console pre:last-child {
+            border-bottom: none;
+        }
+        .timestamp {
+            color: #888;
+            margin-right: 8px;
         }
     </style>
 </head>
@@ -107,9 +117,21 @@
         
         eventSource.onmessage = function(event) {
             const pre = document.createElement('pre');
-            pre.textContent = event.data;
+            const timestamp = new Date().toLocaleTimeString();
+            const timestampSpan = document.createElement('span');
+            timestampSpan.className = 'timestamp';
+            timestampSpan.textContent = `[${timestamp}]`;
+            
+            pre.appendChild(timestampSpan);
+            pre.appendChild(document.createTextNode(event.data));
+            
             consoleDiv.appendChild(pre);
             consoleDiv.scrollTop = consoleDiv.scrollHeight;
+            
+            // Keep only the last 1000 lines
+            while (consoleDiv.children.length > 1000) {
+                consoleDiv.removeChild(consoleDiv.firstChild);
+            }
         };
 
         async function makeRequest(url, method = 'POST', data = null) {
