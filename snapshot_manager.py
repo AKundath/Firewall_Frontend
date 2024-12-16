@@ -13,6 +13,8 @@ class SnapshotManager:
             
         self.timeshift_path = '/usr/bin/timeshift'
         self.config_path = '/etc/timeshift'
+        # Add check for XFCE-specific paths
+        self.xfce_config = os.path.expanduser('~/.config/xfce4')
 
     def clear_screen(self):
         """Clear the terminal screen."""
@@ -67,13 +69,19 @@ class SnapshotManager:
         """Check if Timeshift is installed and configured."""
         if not os.path.exists(self.timeshift_path):
             print("\nTimeshift is not installed. Installing now...")
-            if not self.run_command(['apt', 'install', 'timeshift', '-y']):
+            # Use apt-get instead of apt for better script compatibility
+            if not self.run_command(['apt-get', 'install', 'timeshift', '-y']):
                 print("Failed to install Timeshift")
+                # Add more detailed error message for Mint users
+                print("Please try installing manually with: sudo apt-get install timeshift")
                 return False
         
         if not os.path.exists(self.config_path):
-            print("\nTimeshift is not configured. Please run 'sudo timeshift --setup' first.")
-            return False
+            print("\nTimeshift is not configured. Running initial setup...")
+            # Add automatic configuration for XFCE
+            if not self.run_command(['timeshift', '--setup']):
+                print("\nPlease run 'sudo timeshift-gtk' to configure Timeshift graphically")
+                return False
             
         return True
 
@@ -84,22 +92,22 @@ class SnapshotManager:
                 return False
                 
             if description is None:
-                description = f"Auto-snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                description = f"Mint_XFCE_snapshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             
             print("\nCreating system snapshot...")
             command = ['timeshift', '--create', '--comments', description, '--verbose']
             success = self.run_command(command)
             
-            # Check for specific error patterns in the output
+            # Add XFCE-specific error checking
             if self.last_command_output.get('stderr') and (
                 'rsync returned an error' in self.last_command_output['stderr'] or 
                 'Failed to create new snapshot' in self.last_command_output['stderr']
             ):
                 print("\nSnapshot creation failed - rsync error detected")
-                print("Please run 'sudo timeshift --setup' to verify backup location")
+                print("Please verify backup location has enough space")
+                print("You can also use timeshift-gtk to configure settings")
                 return False
                 
-            # Check if the output contains successful completion markers
             if self.last_command_output.get('stdout') and 'Removing snapshots (incomplete)' in self.last_command_output['stdout']:
                 print("\nSnapshot was incomplete and was cleaned up")
                 print("Please verify backup location has enough space")
@@ -107,6 +115,7 @@ class SnapshotManager:
                 
             if not success:
                 print("\nSnapshot creation failed - unknown error")
+                print("Try running timeshift-gtk to verify settings")
                 return False
                 
             return True
@@ -130,12 +139,13 @@ class SnapshotManager:
     def display_menu(self):
         """Display the snapshot menu."""
         self.clear_screen()
-        print("=== System Snapshot Menu ===")
+        print("=== Linux Mint XFCE System Snapshot Menu ===")
         print("\n1. Create snapshot with default name")
         print("2. Create snapshot with custom description")
         print("3. List existing snapshots")
-        print("4. Back to main menu")
-        return input("\nEnter your choice (1-4): ")
+        print("4. Open Timeshift GUI (timeshift-gtk)")
+        print("5. Exit")
+        return input("\nEnter your choice (1-5): ")
 
     def run(self):
         """Run the snapshot menu loop."""
@@ -164,6 +174,10 @@ class SnapshotManager:
                 input("\nPress Enter to continue...")
                 
             elif choice == '4':
+                # Add option to open Timeshift GUI
+                self.run_command(['timeshift-gtk'])
+                
+            elif choice == '5':
                 break
 
 if __name__ == "__main__":
