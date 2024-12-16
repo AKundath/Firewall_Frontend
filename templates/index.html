@@ -1,0 +1,177 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ubuntu System Management</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <style>
+        .console {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: monospace;
+            padding: 1rem;
+            border-radius: 0.375rem;
+            height: 300px;
+            overflow-y: auto;
+        }
+        .console pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">Ubuntu System Management</h1>
+        
+        <!-- Console Output -->
+        <div class="mb-8">
+            <h2 class="text-xl font-semibold mb-2">Console Output</h2>
+            <div id="console" class="console"></div>
+        </div>
+
+        <!-- System Updates -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">System Updates</h2>
+            <button onclick="updateSystem()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                Update System
+            </button>
+        </div>
+
+        <!-- System Snapshots -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">System Snapshots</h2>
+            <div class="flex gap-4 mb-4">
+                <input type="text" id="snapshotDescription" placeholder="Snapshot description" 
+                       class="border rounded px-3 py-2 flex-grow">
+                <button onclick="createSnapshot()" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                    Create Snapshot
+                </button>
+            </div>
+            <button onclick="listSnapshots()" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+                List Snapshots
+            </button>
+        </div>
+
+        <!-- Firewall Management -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Firewall Management</h2>
+            <div class="flex gap-4 mb-4">
+                <button onclick="toggleFirewall(true)" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                    Enable Firewall
+                </button>
+                <button onclick="toggleFirewall(false)" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                    Disable Firewall
+                </button>
+                <button onclick="checkFirewallStatus()" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    Check Status
+                </button>
+            </div>
+            <div class="flex gap-4">
+                <input type="number" id="portNumber" placeholder="Port number" class="border rounded px-3 py-2">
+                <select id="portProtocol" class="border rounded px-3 py-2">
+                    <option value="tcp">TCP</option>
+                    <option value="udp">UDP</option>
+                </select>
+                <button onclick="managePort('open')" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                    Open Port
+                </button>
+                <button onclick="managePort('close')" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                    Close Port
+                </button>
+            </div>
+        </div>
+
+        <!-- IP Management -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold mb-4">IP Management</h2>
+            <div class="flex gap-4">
+                <input type="text" id="ipAddress" placeholder="IP address" class="border rounded px-3 py-2 flex-grow">
+                <button onclick="manageIP('allow')" class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                    Allow IP
+                </button>
+                <button onclick="manageIP('deny')" class="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                    Deny IP
+                </button>
+                <button onclick="manageIP('delete')" class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+                    Delete Rules
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set up EventSource for console output
+        const eventSource = new EventSource('/stream');
+        const consoleDiv = document.getElementById('console');
+        
+        eventSource.onmessage = function(event) {
+            const pre = document.createElement('pre');
+            pre.textContent = event.data;
+            consoleDiv.appendChild(pre);
+            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+        };
+
+        async function makeRequest(url, method = 'POST', data = null) {
+            try {
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: data ? JSON.stringify(data) : null
+                });
+                const result = await response.json();
+                
+                if (result.status === 'error') {
+                    throw new Error(result.message || 'Operation failed');
+                }
+                
+                return result;
+            } catch (error) {
+                console.error('Error:', error);
+                alert(error.message || 'Operation failed');
+            }
+        }
+
+        async function updateSystem() {
+            await makeRequest('/system/update');
+        }
+
+        async function createSnapshot() {
+            const description = document.getElementById('snapshotDescription').value;
+            await makeRequest('/snapshot/create', 'POST', { description });
+        }
+
+        async function listSnapshots() {
+            await makeRequest('/snapshot/list', 'GET');
+        }
+
+        async function checkFirewallStatus() {
+            const status = await makeRequest('/firewall/status', 'GET');
+            alert(`Firewall is ${status.active ? 'active' : 'inactive'}\n\n${status.status_details}`);
+        }
+
+        async function toggleFirewall(enable) {
+            await makeRequest('/firewall/toggle', 'POST', { action: enable ? 'enable' : 'disable' });
+        }
+
+        async function managePort(action) {
+            const port = parseInt(document.getElementById('portNumber').value);
+            const protocol = document.getElementById('portProtocol').value;
+            
+            if (isNaN(port) || port < 1 || port > 65535) {
+                alert('Please enter a valid port number (1-65535)');
+                return;
+            }
+            
+            await makeRequest('/firewall/port', 'POST', { action, port, protocol });
+        }
+
+        async function manageIP(action) {
+            const ipAddress = document.getElementById('ipAddress').value;
+            await makeRequest('/ip/manage', 'POST', { action, ip_address: ipAddress });
+        }
+    </script>
+</body>
+</html>
